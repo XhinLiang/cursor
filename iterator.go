@@ -1,18 +1,23 @@
 package iterator
 
+import (
+	"context"
+	"fmt"
+)
+
 type Entity interface {
 }
 
 type CursorIterator[T Entity] struct {
 	initCursor      int64
-	dataRetriever   func(cursor int64) (data []T)
+	dataRetriever   func(ctx context.Context, cursor int64) (data []T)
 	cursorExtractor func(data []T) (nextCursor int64)
-	endChecker      func(int64) (isEnd bool)
+	endChecker      func(ctx context.Context, cursor int64) (shouldEnd bool)
 }
 
-func NewCursorIteratorExBuilder[T Entity]() *CursorIterator[T] {
+func NewCursorIteratorBuilder[T Entity]() *CursorIterator[T] {
 	return &CursorIterator[T]{
-		endChecker: func(id int64) bool {
+		endChecker: func(ctx context.Context, id int64) bool {
 			return id == 0
 		},
 	}
@@ -23,37 +28,50 @@ func (c *CursorIterator[T]) WithInitCursor(id int64) *CursorIterator[T] {
 	return c
 }
 
-func (c *CursorIterator[T]) WithDataRetriever(retriever func(int64) []T) *CursorIterator[T] {
+func (c *CursorIterator[T]) WithDataRetriever(retriever func(ctx context.Context, cursor int64) (data []T)) *CursorIterator[T] {
 	c.dataRetriever = retriever
 	return c
 }
 
-func (c *CursorIterator[T]) WithCursorExtractor(extractor func([]T) int64) *CursorIterator[T] {
+func (c *CursorIterator[T]) WithCursorExtractor(extractor func(data []T) (nextCursor int64)) *CursorIterator[T] {
 	c.cursorExtractor = extractor
 	return c
 }
 
-func (c *CursorIterator[T]) WithEndChecker(checker func(int64) bool) *CursorIterator[T] {
+func (c *CursorIterator[T]) WithEndChecker(checker func(ctx context.Context, cursor int64) (shouldEnd bool)) *CursorIterator[T] {
 	c.endChecker = checker
 	return c
 }
 
-func (c *CursorIterator[T]) Iterate(handler func(t T) (shouldEnd bool, handlerErr error)) error {
+// dataProcessor is a function type that processes an Entity.
+// It returns a boolean indicating whether the iteration should end, and any error encountered.
+type dataProcessor[T Entity] func(t T) (shouldEnd bool, handlerErr error)
+
+func (c *CursorIterator[T]) Iterate(ctx context.Context, processor dataProcessor[T]) error {
+	if c.dataRetriever == nil || c.cursorExtractor == nil {
+		return fmt.Errorf("iterator not properly set up")
+	}
 	cursor := c.initCursor
-	if c.endChecker(cursor) {
+	if c.endChecker(ctx, cursor) {
 		return nil
 	}
 	for {
-		data := c.dataRetriever(cursor)
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+
+		data := c.dataRetriever(ctx, cursor)
 		for _, e := range data {
-			if shouldEnd, err := handler(e); err != nil {
+			if shouldEnd, err := processor(e); err != nil {
 				return err
 			} else if shouldEnd {
 				return nil
 			}
 		}
 		cursor = c.cursorExtractor(data)
-		if c.endChecker(cursor) {
+		if c.endChecker(ctx, cursor) {
 			break
 		}
 	}

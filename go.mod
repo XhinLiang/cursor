@@ -1,3 +1,3 @@
-module github.com/xhinliang/go-iterator
+module github.com/xhinliang/iterator
 
 go 1.19
