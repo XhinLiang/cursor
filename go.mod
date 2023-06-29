@@ -1,3 +1,3 @@
 module github.com/xhinliang/iterator
 
-go 1.19
+go 1.18
