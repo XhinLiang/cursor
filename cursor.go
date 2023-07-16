@@ -27,12 +27,12 @@ func (c *Builder) WithInitCursor(id int64) *Builder {
 	return c
 }
 
-func (c *Builder) WithDataRetriever(retriever func(context.Context, int64) (Any, error)) *Builder {
+func (c *Builder) WithDataRetriever(retriever func(ctx context.Context, cursor int64) (dataSlice Any, err error)) *Builder {
 	c.dataRetriever = retriever
 	return c
 }
 
-func (c *Builder) WithCursorExtractor(extractor func(Any) (bool, int64, error)) *Builder {
+func (c *Builder) WithCursorExtractor(extractor func(dataSlice Any) (shouldEnd bool, nextCursor int64, err error)) *Builder {
 	c.cursorExtractor = extractor
 	return c
 }
@@ -43,9 +43,8 @@ type iterator struct {
 	cursorExtractor func(data Any) (shouldEnd bool, nextCursor int64, err error)
 }
 
-// dataProcessor is a function type that processes an Any.
-// It returns a boolean indicating whether the iteration should end, and any error encountered.
-type DataProcessor func(t Any) (shouldEnd bool, handlerErr error)
+// dataProcessor is a function type that processes the single entity from the data slice
+type DataProcessor func(t Any) error
 
 type Iterator interface {
 	Iterate(ctx context.Context, processor DataProcessor) error
@@ -76,6 +75,7 @@ func (c *iterator) Iterate(ctx context.Context, processor DataProcessor) error {
 			return retrievedErr
 		}
 
+		// TODO provide batch iterating
 		if v := reflect.ValueOf(retrievedData); v.Kind() == reflect.Slice {
 			for i := 0; i < v.Len(); i++ {
 				processor(v.Index(i).Interface())
