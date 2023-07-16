@@ -1,4 +1,4 @@
-package iterator
+package cursor
 
 import (
 	"context"
@@ -38,11 +38,12 @@ func TestCursorIterator(t *testing.T) {
 		return cursor >= int64(len(entities))
 	}
 
-	iterator := NewCursorIteratorBuilder().
+	iterator := NewBuilder().
 		WithInitCursor(0).
 		WithDataRetriever(dataRetriever).
 		WithCursorExtractor(cursorExtractor).
-		WithEndChecker(endChecker)
+		WithEndChecker(endChecker).
+		Build()
 
 	err := iterator.Iterate(ctx, func(t Any) (shouldEnd bool, handlerErr error) {
 		entity := t.(SimpleEntity)
@@ -64,7 +65,7 @@ func TestLargeCursorIterator(t *testing.T) {
 		entities[i] = SimpleEntity{value: i + 1}
 	}
 
-	iterator := NewCursorIteratorBuilder().
+	iterator := NewBuilder().
 		WithInitCursor(0).
 		WithDataRetriever(func(ctx context.Context, cursor int64) (data Any) {
 			time.Sleep(10 * time.Millisecond) // Simulate network latency
@@ -84,7 +85,8 @@ func TestLargeCursorIterator(t *testing.T) {
 		}).
 		WithEndChecker(func(ctx context.Context, cursor int64) (shouldEnd bool) {
 			return cursor >= int64(len(entities))
-		})
+		}).
+		Build()
 
 	// Count entities to verify all entities are fetched
 	count := 0
