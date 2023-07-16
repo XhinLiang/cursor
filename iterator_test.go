@@ -22,14 +22,15 @@ func TestCursorIterator(t *testing.T) {
 		{value: 5},
 	}
 
-	dataRetriever := func(ctx context.Context, cursor int64) (data []SimpleEntity) {
+	dataRetriever := func(ctx context.Context, cursor int64) (data Any) {
 		if cursor < int64(len(entities)) {
 			return entities[cursor : cursor+1]
 		}
 		return []SimpleEntity{}
 	}
 
-	cursorExtractor := func(data []SimpleEntity) (nextCursor int64) {
+	cursorExtractor := func(d Any) (nextCursor int64) {
+		data := d.([]SimpleEntity)
 		return int64(data[len(data)-1].value)
 	}
 
@@ -37,14 +38,15 @@ func TestCursorIterator(t *testing.T) {
 		return cursor >= int64(len(entities))
 	}
 
-	iterator := NewCursorIteratorBuilder[SimpleEntity]().
+	iterator := NewCursorIteratorBuilder().
 		WithInitCursor(0).
 		WithDataRetriever(dataRetriever).
 		WithCursorExtractor(cursorExtractor).
 		WithEndChecker(endChecker)
 
-	err := iterator.Iterate(ctx, func(t SimpleEntity) (shouldEnd bool, handlerErr error) {
-		fmt.Println("Processing entity: ", t.value)
+	err := iterator.Iterate(ctx, func(t Any) (shouldEnd bool, handlerErr error) {
+		entity := t.(SimpleEntity)
+		fmt.Println("Processing entity: ", entity.value)
 		return false, nil
 	})
 
@@ -62,9 +64,9 @@ func TestLargeCursorIterator(t *testing.T) {
 		entities[i] = SimpleEntity{value: i + 1}
 	}
 
-	iterator := NewCursorIteratorBuilder[SimpleEntity]().
+	iterator := NewCursorIteratorBuilder().
 		WithInitCursor(0).
-		WithDataRetriever(func(ctx context.Context, cursor int64) (data []SimpleEntity) {
+		WithDataRetriever(func(ctx context.Context, cursor int64) (data Any) {
 			time.Sleep(10 * time.Millisecond) // Simulate network latency
 			if cursor < int64(len(entities)) {
 				// Fetch 10 items per batch
@@ -76,7 +78,8 @@ func TestLargeCursorIterator(t *testing.T) {
 			}
 			return []SimpleEntity{}
 		}).
-		WithCursorExtractor(func(data []SimpleEntity) (nextCursor int64) {
+		WithCursorExtractor(func(d Any) (nextCursor int64) {
+			data := d.([]SimpleEntity)
 			return int64(data[len(data)-1].value)
 		}).
 		WithEndChecker(func(ctx context.Context, cursor int64) (shouldEnd bool) {
@@ -85,7 +88,7 @@ func TestLargeCursorIterator(t *testing.T) {
 
 	// Count entities to verify all entities are fetched
 	count := 0
-	err := iterator.Iterate(ctx, func(t SimpleEntity) (shouldEnd bool, handlerErr error) {
+	err := iterator.Iterate(ctx, func(t Any) (shouldEnd bool, handlerErr error) {
 		count++
 		return false, nil
 	})
