@@ -15,15 +15,11 @@ type Any interface {
 type Builder struct {
 	initCursor      int64
 	dataRetriever   func(ctx context.Context, cursor int64) (data Any, err error)
-	cursorExtractor func(data Any) (nextCursor int64, err error)
+	cursorExtractor func(data Any) (shouldEnd bool, nextCursor int64, err error)
 }
 
 func NewBuilder() *Builder {
-	return &Builder{
-		endChecker: func(ctx context.Context, id int64) bool {
-			return id == 0
-		},
-	}
+	return &Builder{}
 }
 
 func (c *Builder) WithInitCursor(id int64) *Builder {
@@ -31,12 +27,12 @@ func (c *Builder) WithInitCursor(id int64) *Builder {
 	return c
 }
 
-func (c *Builder) WithDataRetriever(retriever func(ctx context.Context, cursor int64) (data Any)) *Builder {
+func (c *Builder) WithDataRetriever(retriever func(context.Context, int64) (Any, error)) *Builder {
 	c.dataRetriever = retriever
 	return c
 }
 
-func (c *Builder) WithCursorExtractor(extractor func(data Any) (nextCursor int64)) *Builder {
+func (c *Builder) WithCursorExtractor(extractor func(Any) (bool, int64, error)) *Builder {
 	c.cursorExtractor = extractor
 	return c
 }
@@ -44,7 +40,7 @@ func (c *Builder) WithCursorExtractor(extractor func(data Any) (nextCursor int64
 type iterator struct {
 	initCursor      int64
 	dataRetriever   func(ctx context.Context, cursor int64) (data Any, err error)
-	cursorExtractor func(data Any) (nextCursor int64, err error)
+	cursorExtractor func(data Any) (shouldEnd bool, nextCursor int64, err error)
 }
 
 // dataProcessor is a function type that processes an Any.
@@ -68,9 +64,6 @@ func (c *iterator) Iterate(ctx context.Context, processor DataProcessor) error {
 		return ErrIteratorNotProperlySetUp
 	}
 	cursor := c.initCursor
-	if c.endChecker(ctx, cursor) {
-		return nil
-	}
 	for {
 		select {
 		case <-ctx.Done():
@@ -78,9 +71,12 @@ func (c *iterator) Iterate(ctx context.Context, processor DataProcessor) error {
 		default:
 		}
 
-		data := c.dataRetriever(ctx, cursor)
+		retrievedData, retrievedErr := c.dataRetriever(ctx, cursor)
+		if retrievedErr != nil {
+			return retrievedErr
+		}
 
-		if v := reflect.ValueOf(data); v.Kind() == reflect.Slice {
+		if v := reflect.ValueOf(retrievedData); v.Kind() == reflect.Slice {
 			for i := 0; i < v.Len(); i++ {
 				processor(v.Index(i).Interface())
 			}
@@ -88,10 +84,13 @@ func (c *iterator) Iterate(ctx context.Context, processor DataProcessor) error {
 			return ErrDataIsNotSlice
 		}
 
-		cursor = c.cursorExtractor(data)
-		if c.endChecker(ctx, cursor) {
-			break
+		shouldEnd, nextCursor, err := c.cursorExtractor(retrievedData)
+		if err != nil {
+			return err
 		}
+		if shouldEnd {
+			return nil
+		}
+		cursor = nextCursor
 	}
-	return nil
 }

@@ -22,27 +22,26 @@ func TestCursorIterator(t *testing.T) {
 		{value: 5},
 	}
 
-	dataRetriever := func(ctx context.Context, cursor int64) (data Any) {
+	dataRetriever := func(ctx context.Context, cursor int64) (data Any, err error) {
 		if cursor < int64(len(entities)) {
-			return entities[cursor : cursor+1]
+			return entities[cursor : cursor+1], nil
 		}
-		return []SimpleEntity{}
+		return []SimpleEntity{}, nil
 	}
 
-	cursorExtractor := func(d Any) (nextCursor int64) {
+	cursorExtractor := func(d Any) (shouldEnd bool, nextCursor int64, err error) {
 		data := d.([]SimpleEntity)
-		return int64(data[len(data)-1].value)
-	}
-
-	endChecker := func(ctx context.Context, cursor int64) (shouldEnd bool) {
-		return cursor >= int64(len(entities))
+		nextCursor = int64(data[len(data)-1].value)
+		if nextCursor >= int64(len(entities)) {
+			return true, 0, nil
+		}
+		return false, nextCursor, nil
 	}
 
 	iterator := NewBuilder().
 		WithInitCursor(0).
 		WithDataRetriever(dataRetriever).
 		WithCursorExtractor(cursorExtractor).
-		WithEndChecker(endChecker).
 		Build()
 
 	err := iterator.Iterate(ctx, func(t Any) (shouldEnd bool, handlerErr error) {
@@ -67,7 +66,7 @@ func TestLargeCursorIterator(t *testing.T) {
 
 	iterator := NewBuilder().
 		WithInitCursor(0).
-		WithDataRetriever(func(ctx context.Context, cursor int64) (data Any) {
+		WithDataRetriever(func(ctx context.Context, cursor int64) (data Any, err error) {
 			time.Sleep(10 * time.Millisecond) // Simulate network latency
 			if cursor < int64(len(entities)) {
 				// Fetch 10 items per batch
@@ -75,16 +74,17 @@ func TestLargeCursorIterator(t *testing.T) {
 				if end > int64(len(entities)) {
 					end = int64(len(entities))
 				}
-				return entities[cursor:end]
+				return entities[cursor:end], nil
 			}
-			return []SimpleEntity{}
+			return []SimpleEntity{}, nil
 		}).
-		WithCursorExtractor(func(d Any) (nextCursor int64) {
+		WithCursorExtractor(func(d Any) (shouldEnd bool, nextCursor int64, err error) {
 			data := d.([]SimpleEntity)
-			return int64(data[len(data)-1].value)
-		}).
-		WithEndChecker(func(ctx context.Context, cursor int64) (shouldEnd bool) {
-			return cursor >= int64(len(entities))
+			nextCursor = int64(data[len(data)-1].value)
+			if nextCursor >= int64(len(entities)) {
+				return true, 0, nil
+			}
+			return false, nextCursor, nil
 		}).
 		Build()
 
