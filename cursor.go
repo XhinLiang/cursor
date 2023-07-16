@@ -14,9 +14,8 @@ type Any interface {
 
 type Builder struct {
 	initCursor      int64
-	dataRetriever   func(ctx context.Context, cursor int64) (data Any)
-	cursorExtractor func(data Any) (nextCursor int64)
-	endChecker      func(ctx context.Context, cursor int64) (shouldEnd bool)
+	dataRetriever   func(ctx context.Context, cursor int64) (data Any, err error)
+	cursorExtractor func(data Any) (nextCursor int64, err error)
 }
 
 func NewBuilder() *Builder {
@@ -42,16 +41,10 @@ func (c *Builder) WithCursorExtractor(extractor func(data Any) (nextCursor int64
 	return c
 }
 
-func (c *Builder) WithEndChecker(checker func(ctx context.Context, cursor int64) (shouldEnd bool)) *Builder {
-	c.endChecker = checker
-	return c
-}
-
 type iterator struct {
 	initCursor      int64
-	dataRetriever   func(ctx context.Context, cursor int64) (data Any)
-	cursorExtractor func(data Any) (nextCursor int64)
-	endChecker      func(ctx context.Context, cursor int64) (shouldEnd bool)
+	dataRetriever   func(ctx context.Context, cursor int64) (data Any, err error)
+	cursorExtractor func(data Any) (nextCursor int64, err error)
 }
 
 // dataProcessor is a function type that processes an Any.
@@ -67,7 +60,6 @@ func (c *Builder) Build() Iterator {
 		initCursor:      c.initCursor,
 		dataRetriever:   c.dataRetriever,
 		cursorExtractor: c.cursorExtractor,
-		endChecker:      c.endChecker,
 	}
 }
 
