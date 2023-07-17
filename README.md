@@ -1,67 +1,61 @@
-# Cursor 
+# Cursor
 
-## Description
+[![Go Report Card](https://goreportcard.com/badge/github.com/XhinLiang/cursor)](https://goreportcard.com/report/github.com/XhinLiang/cursor)
+[![GoDoc](https://godoc.org/github.com/XhinLiang/cursor?status.svg)](https://godoc.org/github.com/XhinLiang/cursor)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
-The `cursor` package provides an easy-to-use framework for building and managing iterators in Go. It features a Builder Pattern implementation for creating iterators, and also abstracts away the underlying logic of iterating over a set of data, given the data retriever and cursor extractor functions.
+Cursor is a library for Go that provides a builder pattern-based approach for handling cursor-based iteration over data. This abstraction layer simplifies the process of implementing cursor-based iteration and reduces boilerplate code, providing flexibility and reusability in code.
 
-## Usage
+## Installation
 
-### Building the Iterator
+To start using cursor, install Go and run `go get`:
 
-You can build an iterator with a Builder. First, you need to initialize a Builder with `NewBuilder()`. After that, you can set up the required functions like data retriever, cursor extractor, and initialize the cursor:
+```sh
+$ go get -u github.com/XhinLiang/cursor
+```
+
+## Examples
+
+To create an iterator with the Cursor library, follow these steps:
+
+1. Create a builder
+2. Set initial cursor
+3. Define a data retriever function
+4. Define a cursor extractor function
+5. Build the iterator
 
 ```go
-iterator := cursor.NewBuilder().
-    WithInitCursor(0).
-    WithDataRetriever(myDataRetriever).
-    WithCursorExtractor(myCursorExtractor).
+builder := cursor.NewBuilder().
+    WithInitCursor(initCursor).
+    WithDataRetriever(myDataRetrieverFunction).
+    WithCursorExtractor(myCursorExtractorFunction).
     Build()
 ```
 
-### Data Retriever
-
-A data retriever is a function that retrieves data based on the current cursor position. It should be a function of type:
+Then, you can use the iterator in your code:
 
 ```go
-func(ctx context.Context, cursor int64) (dataSlice Any, err error)
+err := iterator.Iterate(context.Background(), myDataProcessorFunction)
+if err != nil {
+  log.Fatal(err)
+}
 ```
 
-This function takes in a context and a cursor value, and returns a slice of data.
-
-### Cursor Extractor
-
-A cursor extractor is a function that, given a data slice, decides whether the iteration should end and what the next cursor should be. It should be a function of type:
-
-```go
-func(dataSlice Any) (shouldEnd bool, nextCursor int64, err error)
-```
-
-This function takes in a data slice, and returns a boolean indicating if iteration should end, the next cursor value, and an error, if any occurred.
-
-### Iterating Over Data
-
-Once you have a built iterator, you can iterate over your data with the `Iterate` function, providing a data processor:
-
-```go
-err := iterator.Iterate(ctx, myDataProcessor)
-```
-
-The `DataProcessor` is a function that processes a single entity from the data slice. It should be of type:
-
-```go
-func(t Any) error
-```
+Note that `myDataRetrieverFunction`, `myCursorExtractorFunction`, and `myDataProcessorFunction` need to be defined according to your specific use case.
 
 ## Error Handling
 
-This package defines two errors:
-- `ErrIteratorNotProperlySetUp`: Returned when the iterator is not correctly set up (data retriever or cursor extractor is missing).
-- `ErrDataIsNotSlice`: Returned when the data retrieved is not a slice.
+This library has defined some error types that can be returned:
 
-## Future Work
-
-Batch iterating functionality is currently being developed.
+- `ErrIteratorNotProperlySetUp`: Returned when data retriever or cursor extractor are not properly set up.
+- `ErrDataIsNotSlice`: Returned when the data returned by the data retriever is not a slice.
 
 ## Contributing
 
-If you want to contribute to this project, please feel free to fork the repository, create a feature branch, and open a pull request. If you encounter problems or have suggestions, please open an issue.
+Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change.
+
+Please make sure to update tests as appropriate.
+
+## License
+
+[MIT](https://opensource.org/licenses/MIT)
