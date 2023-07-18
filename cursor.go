@@ -3,62 +3,58 @@ package cursor
 import (
 	"context"
 	"fmt"
-	"reflect"
 )
 
 var ErrIteratorNotProperlySetUp = fmt.Errorf("iterator not properly set up")
 var ErrDataIsNotSlice = fmt.Errorf("data is not a slice")
 
-type Any interface {
+type Builder[T any, U comparable] struct {
+	initCursor      U
+	dataRetriever   func(ctx context.Context, cursor U) (data []T, err error)
+	cursorExtractor func(data []T) (shouldEnd bool, nextCursor U, err error)
 }
 
-type Builder struct {
-	initCursor      int64
-	dataRetriever   func(ctx context.Context, cursor int64) (data Any, err error)
-	cursorExtractor func(data Any) (shouldEnd bool, nextCursor int64, err error)
+func NewBuilder[T any, U comparable]() *Builder[T, U] {
+	return &Builder[T, U]{}
 }
 
-func NewBuilder() *Builder {
-	return &Builder{}
-}
-
-func (c *Builder) WithInitCursor(id int64) *Builder {
+func (c *Builder[T, U]) WithInitCursor(id U) *Builder[T, U] {
 	c.initCursor = id
 	return c
 }
 
-func (c *Builder) WithDataRetriever(retriever func(ctx context.Context, cursor int64) (dataSlice Any, err error)) *Builder {
+func (c *Builder[T, U]) WithDataRetriever(retriever func(ctx context.Context, cursor U) (data []T, err error)) *Builder[T, U] {
 	c.dataRetriever = retriever
 	return c
 }
 
-func (c *Builder) WithCursorExtractor(extractor func(dataSlice Any) (shouldEnd bool, nextCursor int64, err error)) *Builder {
+func (c *Builder[T, U]) WithCursorExtractor(extractor func(data []T) (shouldEnd bool, nextCursor U, err error)) *Builder[T, U] {
 	c.cursorExtractor = extractor
 	return c
 }
 
-type iterator struct {
-	initCursor      int64
-	dataRetriever   func(ctx context.Context, cursor int64) (data Any, err error)
-	cursorExtractor func(data Any) (shouldEnd bool, nextCursor int64, err error)
+type iterator[T any, U comparable] struct {
+	initCursor      U
+	dataRetriever   func(ctx context.Context, cursor U) (data []T, err error)
+	cursorExtractor func(data []T) (shouldEnd bool, nextCursor U, err error)
 }
 
 // dataProcessor is a function type that processes the single entity from the data slice
-type DataProcessor func(t Any) error
+type DataProcessor[T any] func(t T) error
 
-type Iterator interface {
-	Iterate(ctx context.Context, processor DataProcessor) error
+type Iterator[T any, U comparable] interface {
+	Iterate(ctx context.Context, processor DataProcessor[T]) error
 }
 
-func (c *Builder) Build() Iterator {
-	return &iterator{
+func (c *Builder[T, U]) Build() Iterator[T, U] {
+	return &iterator[T, U]{
 		initCursor:      c.initCursor,
 		dataRetriever:   c.dataRetriever,
 		cursorExtractor: c.cursorExtractor,
 	}
 }
 
-func (c *iterator) Iterate(ctx context.Context, processor DataProcessor) error {
+func (c *iterator[T, U]) Iterate(ctx context.Context, processor DataProcessor[T]) error {
 	if c.dataRetriever == nil || c.cursorExtractor == nil {
 		return ErrIteratorNotProperlySetUp
 	}
@@ -76,12 +72,11 @@ func (c *iterator) Iterate(ctx context.Context, processor DataProcessor) error {
 		}
 
 		// TODO provide batch iterating
-		if v := reflect.ValueOf(retrievedData); v.Kind() == reflect.Slice {
-			for i := 0; i < v.Len(); i++ {
-				processor(v.Index(i).Interface())
+		for _, data := range retrievedData {
+			err := processor(data)
+			if err != nil {
+				return err
 			}
-		} else {
-			return ErrDataIsNotSlice
 		}
 
 		shouldEnd, nextCursor, err := c.cursorExtractor(retrievedData)
