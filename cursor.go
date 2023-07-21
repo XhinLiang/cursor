@@ -15,7 +15,7 @@ type Any interface {
 type Builder struct {
 	initCursor      int64
 	dataRetriever   func(ctx context.Context, cursor int64) (list Any, err error)
-	cursorExtractor func(list Any) (shouldEnd bool, nextCursor int64, err error)
+	cursorExtractor func(list Any, previousCursor int64) (shouldEnd bool, nextCursor int64, err error)
 }
 
 func NewBuilder() *Builder {
@@ -32,7 +32,7 @@ func (c *Builder) WithDataRetriever(retriever func(ctx context.Context, cursor i
 	return c
 }
 
-func (c *Builder) WithCursorExtractor(extractor func(list Any) (shouldEnd bool, nextCursor int64, err error)) *Builder {
+func (c *Builder) WithCursorExtractor(extractor func(list Any, previousCursor int64) (shouldEnd bool, nextCursor int64, err error)) *Builder {
 	c.cursorExtractor = extractor
 	return c
 }
@@ -40,7 +40,7 @@ func (c *Builder) WithCursorExtractor(extractor func(list Any) (shouldEnd bool, 
 type iterator struct {
 	initCursor      int64
 	dataRetriever   func(ctx context.Context, cursor int64) (list Any, err error)
-	cursorExtractor func(list Any) (shouldEnd bool, nextCursor int64, err error)
+	cursorExtractor func(list Any, previousCursor int64) (shouldEnd bool, nextCursor int64, err error)
 }
 
 // SingleProcessor is a function type that processes the single entity from the data slice
@@ -99,7 +99,7 @@ func (c *iterator) IterateBatch(ctx context.Context, processor BatchProcessor) e
 			return iterateErr
 		}
 
-		shouldEnd, nextCursor, err := c.cursorExtractor(retrievedList)
+		shouldEnd, nextCursor, err := c.cursorExtractor(retrievedList, cursor)
 		if err != nil {
 			return err
 		}

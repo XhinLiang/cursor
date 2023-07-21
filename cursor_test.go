@@ -30,7 +30,7 @@ func TestCursorIterator(t *testing.T) {
 		return []SimpleEntity{}, nil
 	}
 
-	cursorExtractor := func(d Any) (shouldEnd bool, nextCursor int64, err error) {
+	cursorExtractor := func(d Any, previousCursor int64) (shouldEnd bool, nextCursor int64, err error) {
 		data := d.([]SimpleEntity)
 		nextCursor = int64(data[len(data)-1].value)
 		if nextCursor >= int64(len(entities)) {
@@ -79,7 +79,7 @@ func TestLargeCursorIterator(t *testing.T) {
 			}
 			return []SimpleEntity{}, nil
 		}).
-		WithCursorExtractor(func(d Any) (shouldEnd bool, nextCursor int64, err error) {
+		WithCursorExtractor(func(d Any, previousCursor int64) (shouldEnd bool, nextCursor int64, err error) {
 			data := d.([]SimpleEntity)
 			nextCursor = int64(data[len(data)-1].value)
 			if nextCursor >= int64(len(entities)) {
@@ -125,7 +125,7 @@ func TestCursorIteratorErrorOnDataRetriever(t *testing.T) {
 		return nil, errors.New("data retriever error")
 	}
 
-	cursorExtractor := func(d Any) (shouldEnd bool, nextCursor int64, err error) {
+	cursorExtractor := func(d Any, previousCursor int64) (shouldEnd bool, nextCursor int64, err error) {
 		data := d.([]SimpleEntity)
 		nextCursor = int64(data[len(data)-1].value)
 		return false, nextCursor, nil
@@ -166,7 +166,7 @@ func TestCursorIteratorErrorOnCursorExtractor(t *testing.T) {
 		return []SimpleEntity{}, nil
 	}
 
-	cursorExtractor := func(d Any) (shouldEnd bool, nextCursor int64, err error) {
+	cursorExtractor := func(d Any, previousCursor int64) (shouldEnd bool, nextCursor int64, err error) {
 		data := d.([]SimpleEntity)
 		if len(data) > 0 {
 			// Simulate an error in the cursor extractor function
@@ -212,7 +212,7 @@ func TestCursorIteratorCanceledContext(t *testing.T) {
 		return []SimpleEntity{}, nil
 	}
 
-	cursorExtractor := func(d Any) (shouldEnd bool, nextCursor int64, err error) {
+	cursorExtractor := func(d Any, previousCursor int64) (shouldEnd bool, nextCursor int64, err error) {
 		data := d.([]SimpleEntity)
 		nextCursor = int64(data[len(data)-1].value)
 		if nextCursor >= int64(len(entities)) {
