@@ -39,13 +39,13 @@ func TestCursorIterator(t *testing.T) {
 		return false, nextCursor, nil
 	}
 
-	iterator := NewBuilder().
+	ci := NewBuilder().
 		WithInitCursor(0).
 		WithDataRetriever(dataRetriever).
 		WithCursorExtractor(cursorExtractor).
 		Build()
 
-	err := iterator.Iterate(ctx, func(t Any) error {
+	err := ci.Iterate(ctx, func(t Any) error {
 		entity := t.(SimpleEntity)
 		fmt.Println("Processing entity: ", entity.value)
 		return nil
@@ -65,7 +65,7 @@ func TestLargeCursorIterator(t *testing.T) {
 		entities[i] = SimpleEntity{value: i + 1}
 	}
 
-	iterator := NewBuilder().
+	ci := NewBuilder().
 		WithInitCursor(0).
 		WithDataRetriever(func(ctx context.Context, cursor int64) (data Any, err error) {
 			time.Sleep(10 * time.Millisecond) // Simulate network latency
@@ -91,7 +91,7 @@ func TestLargeCursorIterator(t *testing.T) {
 
 	// Count entities to verify all entities are fetched
 	count := 0
-	err := iterator.Iterate(ctx, func(t Any) error {
+	err := ci.Iterate(ctx, func(t Any) error {
 		count++
 		return nil
 	})
@@ -128,19 +128,16 @@ func TestCursorIteratorErrorOnDataRetriever(t *testing.T) {
 	cursorExtractor := func(d Any) (shouldEnd bool, nextCursor int64, err error) {
 		data := d.([]SimpleEntity)
 		nextCursor = int64(data[len(data)-1].value)
-		if nextCursor >= int64(len(entities)) {
-			return true, 0, nil
-		}
 		return false, nextCursor, nil
 	}
 
-	iterator := NewBuilder().
+	ci := NewBuilder().
 		WithInitCursor(0).
 		WithDataRetriever(dataRetriever).
 		WithCursorExtractor(cursorExtractor).
 		Build()
 
-	err := iterator.Iterate(ctx, func(e Any) error {
+	err := ci.Iterate(ctx, func(e Any) error {
 		entity := e.(SimpleEntity)
 		t.Log("Processing entity: ", entity.value)
 		return nil
@@ -178,13 +175,13 @@ func TestCursorIteratorErrorOnCursorExtractor(t *testing.T) {
 		return true, 0, nil
 	}
 
-	iterator := NewBuilder().
+	ci := NewBuilder().
 		WithInitCursor(0).
 		WithDataRetriever(dataRetriever).
 		WithCursorExtractor(cursorExtractor).
 		Build()
 
-	err := iterator.Iterate(ctx, func(e Any) error {
+	err := ci.Iterate(ctx, func(e Any) error {
 		entity := e.(SimpleEntity)
 		t.Log("Processing entity: ", entity.value)
 		return nil
@@ -224,13 +221,13 @@ func TestCursorIteratorCanceledContext(t *testing.T) {
 		return false, nextCursor, nil
 	}
 
-	iterator := NewBuilder().
+	ci := NewBuilder().
 		WithInitCursor(0).
 		WithDataRetriever(dataRetriever).
 		WithCursorExtractor(cursorExtractor).
 		Build()
 
-	err := iterator.Iterate(ctx, func(e Any) error {
+	err := ci.Iterate(ctx, func(e Any) error {
 		entity := e.(SimpleEntity)
 		t.Log("Processing entity: ", entity.value)
 		return nil
